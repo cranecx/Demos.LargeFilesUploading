@@ -1,0 +1,6 @@
+@Demos.LargeFilesUploading.WebAPI_HostAddress = http://localhost:5074
+
+GET {{Demos.LargeFilesUploading.WebAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
