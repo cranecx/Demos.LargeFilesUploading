@@ -33,7 +33,7 @@ builder.Services.Configure<FormOptions>(x =>
 });
 
 builder.Services.Configure<BlobStorageOptions>(builder.Configuration.GetSection("BlobStorage"));
-builder.Services.AddScoped<IStorageAdapter, BlobStorageAdapter>();
+builder.Services.AddSingleton<IStorageAdapter, BlobStorageAdapter>();
 
 var app = builder.Build();
 

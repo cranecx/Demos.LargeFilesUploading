@@ -13,8 +13,8 @@ namespace Demos.LargeFilesUploading.WebAPI.Adapters
         public BlobStorageAdapter(IOptions<BlobStorageOptions> options)
         {
             _blobStorageOptions = options.Value;
-            _blobServiceClient = new BlobServiceClient(new 
-                Uri($"https://{_blobStorageOptions.AccountName}.blob.core.windows.net"), 
+            _blobServiceClient = new BlobServiceClient(new
+                Uri($"https://{_blobStorageOptions.AccountName}.blob.core.windows.net"),
                 new DefaultAzureCredential());
         }
 
@@ -22,14 +22,9 @@ namespace Demos.LargeFilesUploading.WebAPI.Adapters
         {
             var blobClient = _blobServiceClient
                 .GetBlobContainerClient(_blobStorageOptions.ContainerName!)
-                .GetBlobClient(name);
+                .GetAppendBlobClient(name);
 
-            await blobClient.ExistsAsync();
-
-            if (!await blobClient.ExistsAsync())
-            {
-                await blobClient.UploadAsync(new MemoryStream(), true);
-            }
+            await blobClient.CreateIfNotExistsAsync();
         }
 
         public Task<IStorageWritter> Open(string name)

@@ -52,10 +52,11 @@ public class UploaderService
             int bytesRead;
             long totalBytesRead = 0;
 
-            while ((bytesRead = await content.ReadAsync(buffer.AsMemory(0, chunkSize))) > 0)
+            while ((bytesRead = await content.ReadAsync(buffer, 0, chunkSize)) > 0)
             {
                 using var multipartContent = new MultipartFormDataContent();
-                using var streamedContent = new StreamedContent(new MemoryStream(buffer), 1 * 1024 * 1024);
+                using var memoryBuffer = new MemoryStream(buffer);
+                using var streamedContent = new StreamedContent(memoryBuffer, 1 * 1024 * 1024);
 
                 // Suscribirse a los eventos de StreamedContent
                 streamedContent.SerializationProgressed += (uploaded, total) => UploadProgressed?.Invoke(operationId, totalBytesRead + uploaded, content.Length);
