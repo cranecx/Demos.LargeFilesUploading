@@ -37,7 +37,7 @@ public partial class Home
         if (!FileSelected)
             return;
 
-        await UploaderService!.UploadChunks(FileUploader!.File!, FileUploader.FileName!, 1 * 1024 * 1024);
+        await UploaderService!.UploadFileBlocks(FileUploader!.File!, FileUploader.FileName!, 10 * 1024 * 1024, 1);
     }
 
     private void OnUploadStarted(Guid _)

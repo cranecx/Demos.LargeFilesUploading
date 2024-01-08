@@ -1,7 +1,6 @@
-﻿namespace Demos.LargeFilesUploading.WebAPI.Adapters
+﻿namespace Demos.LargeFilesUploading.WebAPI.Adapters;
+
+public interface IStorageWritter : IDisposable
 {
-    public interface IStorageWritter : IDisposable
-    {
-        Task Append(Memory<byte> data);
-    }
+    Task Append(Memory<byte> data);
 }

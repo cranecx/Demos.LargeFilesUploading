@@ -88,7 +88,7 @@ public class FilesController : ControllerBase
             var fileSection = section.AsFileSection();
             if (fileSection != null)
             {
-                if(operationId == Guid.Empty)
+                if (operationId == Guid.Empty)
                     return BadRequest("Invalid operationId.");
 
                 if (!section.Headers!.TryGetValue("Content-Length", out var contentLength))
@@ -112,6 +112,78 @@ public class FilesController : ControllerBase
             }
         }
 
+        return Ok();
+    }
+
+    [HttpPost]
+    [Route("upload/block")]
+    [DisableFormValueModelBinding]
+    public async Task<IActionResult> UploadBlock()
+    {
+        if (string.IsNullOrEmpty(Request.ContentType) ||
+            !Request.ContentType.Contains("multipart/", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest("Missing or wrong Content-Type header.");
+        }
+
+        var boundary = Request.GetMultipartBoundary();
+        var fileName = string.Empty;
+        var blockId = string.Empty;
+
+        var reader = new MultipartReader(boundary, HttpContext.Request.Body);
+        MultipartSection? section;
+
+        while ((section = await reader.ReadNextSectionAsync()) != null)
+        {
+            var formSection = section.AsFormDataSection();
+
+            if (formSection != null && formSection.Name == nameof(fileName))
+            {
+                fileName = await formSection.GetValueAsync();
+            }
+
+            if (formSection != null && formSection.Name == nameof(blockId))
+            {
+                blockId = await formSection.GetValueAsync();
+            }
+
+            var fileSection = section.AsFileSection();
+            if (fileSection != null)
+            {
+                if (string.IsNullOrEmpty(fileName))
+                    return BadRequest("Invalid file name.");
+
+                if (string.IsNullOrEmpty(blockId))
+                    return BadRequest("Invalid block id.");
+
+                if (!section.Headers!.TryGetValue("Content-Length", out var contentLength))
+                    return BadRequest("Missing Content-Length header in file.");
+
+                var blockSize = int.Parse(contentLength!);
+                using var block = new MemoryStream(blockSize);
+                var bufferSize = 8192;
+                var buffer = new byte[bufferSize];
+                var totalRead = 0;
+                var bytesRead = 0;
+
+                while (totalRead < blockSize && (bytesRead = await fileSection.FileStream!.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                {
+                    await block.WriteAsync(buffer, 0, bytesRead);
+                    totalRead += bytesRead;
+                }
+
+                await _storageAdapter.UploadBlock(fileName, blockId, block);
+            }
+        }
+
+        return Ok();
+    }
+
+    [HttpPost]
+    [Route("upload/block/commit")]
+    public async Task<IActionResult> CommitBlocks(string blobName, [FromBody] List<string> blockIds)
+    {
+        await _storageAdapter.CommitBlocks(blobName, blockIds);
         return Ok();
     }
 }

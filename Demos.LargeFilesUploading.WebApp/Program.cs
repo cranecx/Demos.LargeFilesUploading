@@ -6,6 +6,6 @@ using Demos.LargeFilesUploading.Client;
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
-builder.Services.AddUploaderService("https://labs-blobstorage-wa-01.azurewebsites.net");
+builder.Services.AddUploaderService("https://localhost:7297");
 
 await builder.Build().RunAsync();

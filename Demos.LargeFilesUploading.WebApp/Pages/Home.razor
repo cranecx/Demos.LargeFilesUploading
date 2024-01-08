@@ -4,18 +4,18 @@
 <div class="d-flex flex-grow-1 align-items-center justify-content-center">
     <div>
         @if (!string.IsNullOrEmpty(SuccessMessage))
-        {
-            <div class="alert alert-success" role="alert">
+    {
+        <div class="alert alert-success" role="alert">
                @SuccessMessage
             </div>
-        }
+    }
 
         @if (!string.IsNullOrEmpty(FailedMessage))
-        {
-            <div class="alert alert-danger" role="alert">
+    {
+        <div class="alert alert-danger" role="alert">
                 @FailedMessage
             </div>
-        }
+    }
 
         <fieldset disabled="@FormDisabled">
             <h1 class="display-4">@StatusMessage</h1>
