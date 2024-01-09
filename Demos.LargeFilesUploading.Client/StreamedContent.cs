@@ -21,14 +21,12 @@ public class StreamedContent : HttpContent
     {
         var length = _stream.Length;
         var buffer = new byte[_bufferSize];
-        int totalBytesWrited = 0;
         int bytesRead;
 
         while ((bytesRead = await _stream.ReadAsync(buffer, 0, _bufferSize)) > 0)
         {
             await stream.WriteAsync(buffer, 0, bytesRead);
-            totalBytesWrited += bytesRead;
-            SerializationProgressed?.Invoke(totalBytesWrited, length);
+            SerializationProgressed?.Invoke(bytesRead, length);
         }
     }
 

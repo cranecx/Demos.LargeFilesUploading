@@ -63,7 +63,7 @@ public class UploaderService
                 using var streamedContent = new StreamedContent(memoryBuffer, 1 * 1024 * 1024);
 
                 // Suscribirse a los eventos de StreamedContent
-                streamedContent.SerializationProgressed += (uploaded, total) => UploadProgressed?.Invoke(operationId, totalBytesRead + uploaded, content.Length);
+                streamedContent.SerializationProgressed += (uploaded, _) => UploadProgressed?.Invoke(operationId, totalBytesRead + uploaded, content.Length);
 
                 multipartContent.Add(new StringContent(operationId.ToString()), "operationId");
                 multipartContent.Add(streamedContent, "file", Path.GetFileName(fileName));
@@ -85,15 +85,16 @@ public class UploaderService
         }
     }
 
-    public async Task UploadFileBlocks(Stream content, string fileName, int blockSize, int maxParallelUploads)
+    public async Task UploadBlocks(Stream content, string fileName, int blockSize, int maxParallelUploads)
     {
         var operationId = Guid.NewGuid();
         var blobName = $"{operationId}{Path.GetExtension(fileName)}";
-        var blockIds = new ConcurrentBag<string>();
+        var blockIds = new ConcurrentBag<(int, string)>();
         var semaphore = new SemaphoreSlim(maxParallelUploads);
         var tasks = new List<Task>();
 
         int blockNum = 0;
+        long totalBytesWrote = 0;
         byte[] buffer = new byte[blockSize];
         int bytesRead;
 
@@ -105,18 +106,34 @@ public class UploaderService
             {
                 await semaphore.WaitAsync(); // Espera por un espacio en el semáforo
 
-                var blockId = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{blockNum:D6}"));
-                blockIds.Add(blockId);
+                var blockId = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{Guid.NewGuid()}"));
+                blockIds.Add((blockNum, blockId));
 
                 var blockData = new MemoryStream(buffer, 0, bytesRead);
                 var task = Task.Run(async () =>
                 {
                     try
                     {
-                        await UploadBlockAsync(blobName, blockId, blockData);
+                        using var streamedContent = new StreamedContent(blockData, 1024); // Ajusta el tamaño del buffer según sea necesario
+                        var multipartContent = new MultipartFormDataContent
+                        {
+                            { new StringContent(blobName), "fileName" },
+                            { new StringContent(blockId), "blockId" },
+                            { streamedContent, "file", $"{blockId}.bin" } // Usa blockId para el nombre del archivo temporal
+                        };
+
+                        streamedContent.SerializationProgressed += (bytesWrote, _) =>
+                        {
+                            Interlocked.Add(ref totalBytesWrote, bytesWrote);
+                            UploadProgressed?.Invoke(operationId, Interlocked.Read(ref totalBytesWrote), content.Length);
+                        };
+
+                        var response = await HttpClient.PostAsync("files/upload/block", multipartContent);
+                        response.EnsureSuccessStatusCode();
                     }
                     finally
                     {
+                        blockData.Dispose();
                         semaphore.Release();
                     }
                 });
@@ -125,27 +142,18 @@ public class UploaderService
                 blockNum++;
             }
 
+            var orderedBlocks = blockIds.OrderBy(b => b.Item1)
+                .Select(b => b.Item2)
+                .ToList();
+
             await Task.WhenAll(tasks);
-            await CommitBlocksAsync(blobName, blockIds.ToList());
+            await CommitBlocksAsync(blobName, orderedBlocks);
+            UploadCompleted?.Invoke(operationId);
         }
         catch (Exception ex)
         {
             UploadFailed?.Invoke(operationId, ex);
         }
-    }
-
-    private async Task UploadBlockAsync(string blobName, string blockId, Stream blockData)
-    {
-        using var streamedContent = new StreamedContent(blockData, 1024 * 1024); // Ajusta el tamaño del buffer según sea necesario
-        var multipartContent = new MultipartFormDataContent
-        {
-            { new StringContent(blobName), "fileName" },
-            { new StringContent(blockId), "blockId" },
-            { streamedContent, "file", $"{blockId}.bin" } // Usa blockId para el nombre del archivo temporal
-        };
-
-        var response = await HttpClient.PostAsync("files/upload/block", multipartContent);
-        response.EnsureSuccessStatusCode();
     }
 
     private async Task CommitBlocksAsync(string blobName, IEnumerable<string> blockIds)
